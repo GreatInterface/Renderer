@@ -1,17 +1,18 @@
-ï»¿cmake_minimum_required(VERSION 4.1)
+cmake_minimum_required(VERSION 4.1)
 project(Renderer LANGUAGES CXX C)
 
-# C++23 æ ‡å‡†
+# C++23 ±ê×¼
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# åŒ…ç®¡ç†
+# °ü¹ÜÀí
 find_package(SDL2 CONFIG REQUIRED)
 find_package(imgui CONFIG REQUIRED)
 find_package(glm CONFIG REQUIRED)
 find_package(tinyobjloader CONFIG REQUIRED)
+find_package(spdlog CONFIG REQUIRED)
 
-# æœé›†æºæ–‡ä»¶
+# ËÑ¼¯Ô´ÎÄ¼ş
 file(GLOB_RECURSE SOURCES "Src/*.cpp")
 
 add_executable(Renderer ${SOURCES})
@@ -20,16 +21,17 @@ target_include_directories(Renderer PUBLIC
         ${CMAKE_SOURCE_DIR}/Include
 )
 
-# é“¾æ¥åº“
+# Á´½Ó¿â
 target_link_libraries(${PROJECT_NAME} PRIVATE
         SDL2::SDL2
         SDL2::SDL2main
         imgui::imgui
         glm::glm
         tinyobjloader::tinyobjloader
+        spdlog::spdlog
 )
 
-# è¿™ç§æ–¹å¼åœ¨æ„å»ºé…ç½®é˜¶æ®µå°±ä¼šåˆ›å»ºç›®å½•å¹¶æ‹·è´ï¼Œæ›´å¥å£®
+# ÕâÖÖ·½Ê½ÔÚ¹¹½¨ÅäÖÃ½×¶Î¾Í»á´´½¨Ä¿Â¼²¢¿½±´£¬¸ü½¡×³
 file(MAKE_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/assets")
 
 add_custom_command(TARGET Renderer POST_BUILD

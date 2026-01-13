@@ -1,67 +1,118 @@
-﻿#pragma once
+#pragma once
 
-#define TINYOBJLOADER_IMPLEMENTATION // 必须在一个 .cpp 文件中定义这个宏来实现库
+#define TINYOBJLOADER_IMPLEMENTATION
 #include "tiny_obj_loader.h"
-#include <iostream>
 
+#include "Logger.h"
 #include "Mesh.h"
 
 
 inline bool LoadMesh(const std::string &filepath, Mesh &outMesh)
 {
     tinyobj::ObjReaderConfig reader_config;
-    reader_config.mtl_search_path = "./assets/"; // 材质文件路径 (虽然现在还没用到)
-    reader_config.triangulate = true; // 关键：自动将多边形拆分为三角形
+    reader_config.mtl_search_path = "./assets/"; // �����ļ�·�� (��Ȼ���ڻ�û�õ�)
+    reader_config.triangulate = true; // �ؼ����Զ�������β��Ϊ������
 
     tinyobj::ObjReader reader;
     if (!reader.ParseFromFile(filepath, reader_config))
     {
         if (!reader.Error().empty())
         {
-            std::cerr << "TinyObjReader: " << reader.Error() << std::endl;
+            spdlog::error("TinyObjReader: {}", reader.Error());
         }
         return false;
     }
 
     if (!reader.Warning().empty())
     {
-        std::cout << "TinyObjReader: " << reader.Warning() << std::endl;
+        spdlog::warn("TinyObjReader: {}", reader.Warning());
     }
 
     auto &attrib = reader.GetAttrib();
     auto &shapes = reader.GetShapes();
 
-    // 1. 提取顶点数据
-    // TinyObj 的 vertices 是一个展平的 float 数组 [x, y, z, x, y, z, ...]
-    // 我们需要将其转换为 Math::Vector3
-    outMesh.vertices.clear();
-    outMesh.vertices.reserve(attrib.vertices.size() / 3);
-
-    for (size_t i = 0; i < attrib.vertices.size(); i += 3)
-    {
-        outMesh.vertices.emplace_back(
-            attrib.vertices[i + 0], // x
-            attrib.vertices[i + 1], // y
-            attrib.vertices[i + 2] // z
-        );
-    }
-
-    // 2. 提取索引数据
-    // 目前我们只关心位置索引 (vertex_index)
     outMesh.indices.clear();
+    outMesh.vertices.clear();
 
-    for (const auto &shape: shapes)
+    size_t indexCount = 0;
+    for (const auto &shape : shapes)
     {
-        for (const auto &index: shape.mesh.indices)
+        indexCount += shape.mesh.indices.size();
+    }
+    outMesh.indices.reserve(indexCount);
+    outMesh.vertices.reserve(indexCount);
+
+    const bool hasNormals = !attrib.normals.empty();
+
+    for (const auto &shape : shapes)
+    {
+        for (size_t i = 0; i + 2 < shape.mesh.indices.size(); i += 3)
         {
-            // tinyobj 的 index.vertex_index 就是对应 attrib.vertices 的下标
-            outMesh.indices.push_back(index.vertex_index);
+            const auto &idx0 = shape.mesh.indices[i + 0];
+            const auto &idx1 = shape.mesh.indices[i + 1];
+            const auto &idx2 = shape.mesh.indices[i + 2];
+
+            Math::Vector3 p0{
+                attrib.vertices[3 * idx0.vertex_index + 0],
+                attrib.vertices[3 * idx0.vertex_index + 1],
+                attrib.vertices[3 * idx0.vertex_index + 2]
+            };
+            Math::Vector3 p1{
+                attrib.vertices[3 * idx1.vertex_index + 0],
+                attrib.vertices[3 * idx1.vertex_index + 1],
+                attrib.vertices[3 * idx1.vertex_index + 2]
+            };
+            Math::Vector3 p2{
+                attrib.vertices[3 * idx2.vertex_index + 0],
+                attrib.vertices[3 * idx2.vertex_index + 1],
+                attrib.vertices[3 * idx2.vertex_index + 2]
+            };
+
+            Math::Vector3 n0{};
+            Math::Vector3 n1{};
+            Math::Vector3 n2{};
+
+            if (hasNormals && idx0.normal_index >= 0 && idx1.normal_index >= 0 && idx2.normal_index >= 0)
+            {
+                n0 = {
+                    attrib.normals[3 * idx0.normal_index + 0],
+                    attrib.normals[3 * idx0.normal_index + 1],
+                    attrib.normals[3 * idx0.normal_index + 2]
+                };
+                n1 = {
+                    attrib.normals[3 * idx1.normal_index + 0],
+                    attrib.normals[3 * idx1.normal_index + 1],
+                    attrib.normals[3 * idx1.normal_index + 2]
+                };
+                n2 = {
+                    attrib.normals[3 * idx2.normal_index + 0],
+                    attrib.normals[3 * idx2.normal_index + 1],
+                    attrib.normals[3 * idx2.normal_index + 2]
+                };
+            }
+            else
+            {
+                // OBJ has no normals; derive a flat normal per triangle.
+                Math::Vector3 faceNormal = Math::Vector3::Cross(p1 - p0, p2 - p0);
+                faceNormal.Normalize();
+                n0 = faceNormal;
+                n1 = faceNormal;
+                n2 = faceNormal;
+            }
+
+            outMesh.vertices.emplace_back(p0, n0);
+            outMesh.indices.push_back(static_cast<uint32_t>(outMesh.vertices.size() - 1));
+
+            outMesh.vertices.emplace_back(p1, n1);
+            outMesh.indices.push_back(static_cast<uint32_t>(outMesh.vertices.size() - 1));
+
+            outMesh.vertices.emplace_back(p2, n2);
+            outMesh.indices.push_back(static_cast<uint32_t>(outMesh.vertices.size() - 1));
         }
     }
 
-    std::cout << "Loaded " << filepath << ": "
-            << outMesh.vertices.size() << " vertices, "
-            << outMesh.indices.size() / 3 << " triangles." << std::endl;
+    spdlog::info(SPDLOG_FMT_RUNTIME("Loaded {}: {} vertices, {} triangles."), filepath,
+                 outMesh.vertices.size(), outMesh.indices.size() / 3);
 
     return true;
 }

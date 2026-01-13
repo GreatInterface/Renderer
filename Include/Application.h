@@ -44,8 +44,11 @@ public:
 
     // Barycentric coords for a 2D triangle.
     static Math::Vector3 ComputeBarycentric2D(float x, float y, const Math::Vector3* inV);
+
     // Fill a triangle in screen space.
-    void DrawTriangle(const Math::Vector3& inV0, const Math::Vector3& inV1, const Math::Vector3& inV2, uint32_t inColor);
+    void DrawTriangle(const Math::Vector3& s0, const Math::Vector3& s1, const Math::Vector3& s2,
+                      const Math::Vector3& n0, const Math::Vector3& n1, const Math::Vector3& n2,
+                      uint32_t baseColor);
 
 protected:
     // Override hooks.

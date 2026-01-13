@@ -1,12 +1,11 @@
-﻿
-#include <stdlib.h>
+﻿#include <stdlib.h>
 #include <cmath>
 #include <algorithm>
 
 #include "../Include/Application.h"
 
 
-Application::Application(std::string_view inTitle, uint32_t inWidth, uint32_t inHeight)
+Application::Application(std::string_view inTitle, const uint32_t inWidth, const uint32_t inHeight)
     : title(inTitle), width(inWidth), height(inHeight)
 {
     // Default to black.
@@ -171,46 +170,64 @@ Math::Vector3 Application::ComputeBarycentric2D(float x, float y, const Math::Ve
     return {c1, c2, 1.0f - c1 - c2};
 }
 
-void Application::DrawTriangle(const Math::Vector3 &inV0, const Math::Vector3 &inV1, const Math::Vector3 &inV2,
-                               uint32_t inColor)
+
+void Application::DrawTriangle(const Math::Vector3 &s0, const Math::Vector3 &s1, const Math::Vector3 &s2,
+                               const Math::Vector3 &n0, const Math::Vector3 &n1, const Math::Vector3 &n2,
+                               uint32_t baseColor)
 {
     // Bounding box in screen space.
     // 计算包围盒 (Bounding Box) 并限制在屏幕范围内 (Clamping)
     // 这一步能显著提升性能，防止在屏幕外无效循环
-    int minX = static_cast<int>(std::floor(std::min({inV0.x, inV1.x, inV2.x})));
-    int maxX = static_cast<int>(std::ceil(std::max({inV0.x, inV1.x, inV2.x})));
-    int minY = static_cast<int>(std::floor(std::min({inV0.y, inV1.y, inV2.y})));
-    int maxY = static_cast<int>(std::ceil(std::max({inV0.y, inV1.y, inV2.y})));
+    int minX = static_cast<int>(std::floor(std::min({s0.x, s1.x, s2.x})));
+    int maxX = static_cast<int>(std::ceil(std::max({s0.x, s1.x, s2.x})));
+    int minY = static_cast<int>(std::floor(std::min({s0.y, s1.y, s2.y})));
+    int maxY = static_cast<int>(std::ceil(std::max({s0.y, s1.y, s2.y})));
 
     minX = std::max(0, minX);
     maxX = std::min(static_cast<int>(width) - 1, maxX);
     minY = std::max(0, minY);
     maxY = std::min(static_cast<int>(height) - 1, maxY);
 
-    const Math::Vector3 pts[3] = {inV0, inV1, inV2};
+    Math::Vector3 lightDir{0.5f, 1.0f, -1.0f}; // 定义光源方向
+    lightDir.Normalize();
 
-    // 2. 遍历像素
+    const Math::Vector3 pts[3] = {s0, s1, s2};
+
     for (int y = minY; y <= maxY; ++y)
     {
         for (int x = minX; x <= maxX; ++x)
         {
-            // 3. 计算重心坐标
-            const Math::Vector3 bc = ComputeBarycentric2D(x + 0.5f, y + 0.5f, pts);
-
-            // 4. 如果在三角形内部
+            Math::Vector3 bc = ComputeBarycentric2D(x + 0.5f, y + 0.5f, pts);
             if (bc.x >= 0 && bc.y >= 0 && bc.z >= 0)
             {
-                // 深度插值 (Z-Interpolation)
-                // 注意：在透视投影中，屏幕空间的线性插值在数学上是不完全准确的(应插值 1/w)，
-                // 但对于基础软光栅的第一步，直接插值 Z 是标准做法。
-                const float depth = bc.x * inV0.z + bc.y * inV1.z + bc.z * inV2.z;
-
-                // 深度测试 (Z-Test)
-                // 左手系 DX 风格：Z 越小越近。如果当前像素深度 < 缓冲中的深度，则绘制。
-                if (const int idx = y * width + x; depth < zBuffer[idx])
+                // 1. 深度插值与测试
+                float depth = bc.x * s0.z + bc.y * s1.z + bc.z * s2.z;
+                int idx = y * width + x;
+                if (depth < zBuffer[idx])
                 {
-                    zBuffer[idx] = depth;       // 更新深度
-                    framebuffer[idx] = inColor; // 写入颜色 (直接操作数组比 SetPixel 更快)
+                    zBuffer[idx] = depth;
+
+                    // 2. 法线插值 (Phong Shading 基础)
+                    Math::Vector3 normal;
+                    normal.x = bc.x * n0.x + bc.y * n1.x + bc.z * n2.x;
+                    normal.y = bc.x * n0.y + bc.y * n1.y + bc.z * n2.y;
+                    normal.z = bc.x * n0.z + bc.y * n1.z + bc.z * n2.z;
+                    normal.Normalize();
+
+                    // 1. 定义一个基础环境光强度 (建议 0.1 到 0.2 之间)
+                    float ambient = 0.15f;
+                    // 3. 计算 Lambert 漫反射强度: I = max(0, N dot L)
+                    float intensity = std::max(0.0f, Math::Vector3::Dot(normal, lightDir * -1.0f));
+
+                    // 最终亮度 = 环境光 + 漫反射光
+                    float finalBrightness = std::min(1.0f, ambient + intensity);
+
+                    // 4. 应用光照到颜色 (简单处理 RGB 通道)
+                    const uint8_t r = (uint8_t) ((baseColor & 0x000000FF) * finalBrightness);
+                    const uint8_t g = (uint8_t) (((baseColor & 0x0000FF00) >> 8) * finalBrightness);
+                    const uint8_t b = (uint8_t) (((baseColor & 0x00FF0000) >> 16) * finalBrightness);
+
+                    framebuffer[idx] = 0xFF000000 | (b << 16) | (g << 8) | r;
                 }
             }
         }
