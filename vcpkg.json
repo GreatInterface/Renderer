@@ -1,0 +1,16 @@
+{
+  "name": "renderer",
+  "version-string": "0.1.0",
+  "dependencies": [
+    {
+      "name": "imgui",
+      "default-features": false,
+      "features": [
+        "sdl2-binding",
+        "sdl2-renderer-binding"
+      ]
+    },
+    "sdl2",
+    "glm"
+  ]
+}
