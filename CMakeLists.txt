@@ -9,6 +9,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(SDL2 CONFIG REQUIRED)
 find_package(imgui CONFIG REQUIRED)
 find_package(glm CONFIG REQUIRED)
+find_package(tinyobjloader CONFIG REQUIRED)
 
 # 搜集源文件
 file(GLOB_RECURSE SOURCES "Src/*.cpp")
@@ -25,6 +26,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
         SDL2::SDL2main
         imgui::imgui
         glm::glm
+        tinyobjloader::tinyobjloader
 )
 
 # 这种方式在构建配置阶段就会创建目录并拷贝，更健壮

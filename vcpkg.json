@@ -2,6 +2,7 @@
   "name": "renderer",
   "version-string": "0.1.0",
   "dependencies": [
+    "glm",
     {
       "name": "imgui",
       "default-features": false,
@@ -11,6 +12,6 @@
       ]
     },
     "sdl2",
-    "glm"
+    "tinyobjloader"
   ]
 }

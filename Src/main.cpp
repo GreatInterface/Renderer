@@ -2,6 +2,7 @@
 
 #include "Application.h"
 #include "Mesh.h"
+#include "ModelLoader.h"
 #include "Renderer.h"
 
 class PrimaryApp : public Application
@@ -9,12 +10,15 @@ class PrimaryApp : public Application
 public:
     PrimaryApp(std::string_view inTitle, uint32_t inWidth, uint32_t inHeight) : Application(inTitle, inWidth, inHeight)
     {
-        cubeMesh = CreateCube();
+        if (!LoadMesh("assets/teapot.obj", mesh)) {
+            std::cerr << "Failed to load model, fallback to cube." << std::endl;
+            mesh = CreateCube();
+        }
     }
 
     void OnUpdate(const float deltaTime) override
     {
-        rotationY += deltaTime * 1.57f;
+        rotationY += deltaTime * 1.0f;
     }
 
     void OnRender() override
@@ -22,18 +26,25 @@ public:
         // Clear the framebuffer.
         Clear(0xFF000000);
 
-        // 1. 构建 Model 矩阵 (旋转)
-        // 手写一个简单的 Y 轴旋转矩阵
-        float c = std::cos(rotationY);
-        float s = std::sin(rotationY);
-
+        // 1. Model 矩阵
+        // 茶壶通常比较大，我们把它缩小一点 (Scale 0.1) 并往下移一点
+        const float c = std::cos(rotationY);
+        const float s = std::sin(rotationY);
         Math::Matrix44 model = Math::Matrix44::Identity();
-        model.data[0] = c;  model.data[2] = -s;
-        model.data[8] = s;  model.data[10] = c;
 
-        // 2. View & Projection (保持不变)
-        const Math::Vector3 eye{0.0f, 1.0f, -2.0f}; // 把摄像机稍微抬高一点，看清立体感
-        const Math::Vector3 target{0.0f, 0.0f, 0.0f};
+        // 简单的 Y 轴旋转 + 缩放 (Scale)
+        // 组合矩阵：Scale * Rotation * Translation
+        // 这里手动写死一个旋转 * 缩放
+        constexpr float scale = 0.1f; // 如果茶壶太大，改成 0.1f
+        model.data[0] = c * scale;  model.data[2] = -s * scale;
+        model.data[5] = scale;      // y 轴缩放
+        model.data[8] = s * scale;  model.data[10] = c * scale;
+        model.data[15] = 1.0f;
+
+        // 2. View 矩阵
+        // 把摄像机拉远一点，茶壶可能比单位立方体大
+        const Math::Vector3 eye{0.0f, 2.0f, -50.0f};
+        const Math::Vector3 target{0.0f, 1.0f, 0.0f}; // 看向稍微高一点的地方(茶壶中心)
         const Math::Vector3 up{0.0f, 1.0f, 0.0f};
         const Math::Matrix44 view = Math::Matrix44::LookAtLH(eye, target, up);
 
@@ -46,17 +57,17 @@ public:
         const Math::Matrix44 mvp = Math::Matrix44::Multiply(proj, Math::Matrix44::Multiply(view, model));
 
         // 4. 遍历索引绘制三角形
-        for (size_t i = 0; i < cubeMesh.indices.size(); i += 3)
+        for (size_t i = 0; i < mesh.indices.size(); i += 3)
         {
             // 获取三角形的三个顶点索引
-            const uint32_t idx0 = cubeMesh.indices[i];
-            const uint32_t idx1 = cubeMesh.indices[i+1];
-            const uint32_t idx2 = cubeMesh.indices[i+2];
+            const uint32_t idx0 = mesh.indices[i];
+            const uint32_t idx1 = mesh.indices[i+1];
+            const uint32_t idx2 = mesh.indices[i+2];
 
             // 获取原始顶点
-            const Math::Vector3& v0 = cubeMesh.vertices[idx0];
-            const Math::Vector3& v1 = cubeMesh.vertices[idx1];
-            const Math::Vector3& v2 = cubeMesh.vertices[idx2];
+            const Math::Vector3& v0 = mesh.vertices[idx0];
+            const Math::Vector3& v1 = mesh.vertices[idx1];
+            const Math::Vector3& v2 = mesh.vertices[idx2];
 
             // Vertex Shader: 变换到裁剪空间
             auto process = [&](const Math::Vector3& v) {
@@ -82,7 +93,7 @@ public:
     }
 
 private:
-    Mesh cubeMesh;
+    Mesh mesh;
     float rotationY = 0.0f;
 };
 
