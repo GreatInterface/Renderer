@@ -19,7 +19,7 @@ public:
         const Math::Vector3 v2{-0.5f, -0.5f, 0.0f};
 
         const Math::Vector3 eye{0.0f, 0.0f, -2.0f};
-        const Math::Vector3 target{0.0f, 0.0f, 1.0f};
+        const Math::Vector3 target{0.0f, 0.0f, 0.0f};
         const Math::Vector3 up{0.0f, 1.0f, 0.0f};
         const Math::Matrix44 view = Math::Matrix44::LookAtLH(eye, target, up);
 
@@ -40,9 +40,11 @@ public:
         Math::Vector3 s2 = processVertex(v2);
 
         // Draw red wireframe
-        DrawLine((int)s0.x, (int)s0.y, (int)s1.x, (int)s1.y, 0xFF0000FF);
-        DrawLine((int)s1.x, (int)s1.y, (int)s2.x, (int)s2.y, 0xFF0000FF);
-        DrawLine((int)s2.x, (int)s2.y, (int)s0.x, (int)s0.y, 0xFF0000FF);
+        // DrawLine((int)s0.x, (int)s0.y, (int)s1.x, (int)s1.y, 0xFF0000FF);
+        // DrawLine((int)s1.x, (int)s1.y, (int)s2.x, (int)s2.y, 0xFF0000FF);
+        // DrawLine((int)s2.x, (int)s2.y, (int)s0.x, (int)s0.y, 0xFF0000FF);
+
+        DrawTriangle(s0, s1, s2, 0xFF0000FF);
     }
 };
 

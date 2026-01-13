@@ -70,4 +70,7 @@ private:
 
     // CPU framebuffer in RGBA.
     std::vector<uint32_t> framebuffer;
+
+    // 深度缓冲区 (用于处理遮挡关系)
+    std::vector<float> zBuffer;
 };

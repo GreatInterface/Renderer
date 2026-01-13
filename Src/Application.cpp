@@ -11,6 +11,9 @@ Application::Application(std::string_view inTitle, uint32_t inWidth, uint32_t in
 {
     // Default to black.
     framebuffer.resize(inWidth * inHeight, 0xFF000000);
+
+    // 默认深度 1.0 (最远)
+    zBuffer.resize(inWidth * inHeight, 1.0f);
 }
 
 Application::~Application()
@@ -107,6 +110,7 @@ void Application::Resize(uint32_t newWidth, uint32_t newHeight)
     height = newHeight;
 
     framebuffer.assign(width * height, 0xFF000000);
+    zBuffer.assign(width * height, 1.0f);
 
     screenTexture.reset(SDL_CreateTexture(
         renderer.get(),
@@ -125,7 +129,8 @@ void Application::SetPixel(uint32_t x, uint32_t y, uint32_t color)
 
 void Application::Clear(const uint32_t color)
 {
-    std::fill(framebuffer.begin(), framebuffer.end(), color);
+    ranges::fill(framebuffer, color);
+    ranges::fill(zBuffer, 1.0f);
 }
 
 void Application::DrawLine(int inX0, int inY0, const int inX1, const int inY1, const uint32_t inColor)
@@ -170,22 +175,43 @@ void Application::DrawTriangle(const Math::Vector3 &inV0, const Math::Vector3 &i
                                uint32_t inColor)
 {
     // Bounding box in screen space.
-    const int minX = static_cast<int>(std::floor(std::min({inV0.x, inV1.x, inV2.x})));
-    const int maxX = static_cast<int>(std::ceil(std::max({inV0.x, inV1.x, inV2.x})));
-    const int minY = static_cast<int>(std::floor(std::min({inV0.y, inV1.y, inV2.y})));
-    const int maxY = static_cast<int>(std::ceil(std::max({inV0.y, inV1.y, inV2.y})));
+    // 计算包围盒 (Bounding Box) 并限制在屏幕范围内 (Clamping)
+    // 这一步能显著提升性能，防止在屏幕外无效循环
+    int minX = static_cast<int>(std::floor(std::min({inV0.x, inV1.x, inV2.x})));
+    int maxX = static_cast<int>(std::ceil(std::max({inV0.x, inV1.x, inV2.x})));
+    int minY = static_cast<int>(std::floor(std::min({inV0.y, inV1.y, inV2.y})));
+    int maxY = static_cast<int>(std::ceil(std::max({inV0.y, inV1.y, inV2.y})));
+
+    minX = std::max(0, minX);
+    maxX = std::min(static_cast<int>(width) - 1, maxX);
+    minY = std::max(0, minY);
+    maxY = std::min(static_cast<int>(height) - 1, maxY);
 
     const Math::Vector3 pts[3] = {inV0, inV1, inV2};
 
-    // Fill pixels inside the bounding box.
+    // 2. 遍历像素
     for (int y = minY; y <= maxY; ++y)
     {
         for (int x = minX; x <= maxX; ++x)
         {
-            Math::Vector3 bc = ComputeBarycentric2D(x + 0.5f, y + 0.5f, pts);
+            // 3. 计算重心坐标
+            const Math::Vector3 bc = ComputeBarycentric2D(x + 0.5f, y + 0.5f, pts);
+
+            // 4. 如果在三角形内部
             if (bc.x >= 0 && bc.y >= 0 && bc.z >= 0)
             {
-                SetPixel(x, y, inColor);
+                // 深度插值 (Z-Interpolation)
+                // 注意：在透视投影中，屏幕空间的线性插值在数学上是不完全准确的(应插值 1/w)，
+                // 但对于基础软光栅的第一步，直接插值 Z 是标准做法。
+                const float depth = bc.x * inV0.z + bc.y * inV1.z + bc.z * inV2.z;
+
+                // 深度测试 (Z-Test)
+                // 左手系 DX 风格：Z 越小越近。如果当前像素深度 < 缓冲中的深度，则绘制。
+                if (const int idx = y * width + x; depth < zBuffer[idx])
+                {
+                    zBuffer[idx] = depth;       // 更新深度
+                    framebuffer[idx] = inColor; // 写入颜色 (直接操作数组比 SetPixel 更快)
+                }
             }
         }
     }
