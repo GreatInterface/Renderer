@@ -37,33 +37,21 @@ public:
         const Math::Vector3 up{0.0f, 1.0f, 0.0f};
         const Math::Matrix44 view = Math::Matrix44::LookAtLH(eye, target, up);
 
-        // // Triangle in model space.
-        // const Math::Vector3 v0{ 0.0f,  0.5f, 0.0f};
-        // const Math::Vector3 v1{ 0.5f, -0.5f, 0.0f};
-        // const Math::Vector3 v2{-0.5f, -0.5f, 0.0f};
-        //
-        // const Math::Vector3 eye{0.0f, 0.0f, -2.0f};
-        // const Math::Vector3 target{0.0f, 0.0f, 0.0f};
-        // const Math::Vector3 up{0.0f, 1.0f, 0.0f};
-        // const Math::Matrix44 view = Math::Matrix44::LookAtLH(eye, target, up);
-
-        // const Math::Matrix44 mvp = Math::Matrix44::Multiply(proj, view);
-
         const auto screenW = static_cast<float>(GetWidth());
         const auto screenH = static_cast<float>(GetHeight());
         const float aspect = screenW / screenH;
         const Math::Matrix44 proj = Math::Matrix44::PerspectiveFovLH(3.1415926f / 4.0f, aspect, 0.1f, 100.0f);
 
         // 3. 计算 MVP = Proj * View * Model
-        Math::Matrix44 mvp = Math::Matrix44::Multiply(proj, Math::Matrix44::Multiply(view, model));
+        const Math::Matrix44 mvp = Math::Matrix44::Multiply(proj, Math::Matrix44::Multiply(view, model));
 
         // 4. 遍历索引绘制三角形
         for (size_t i = 0; i < cubeMesh.indices.size(); i += 3)
         {
             // 获取三角形的三个顶点索引
-            uint32_t idx0 = cubeMesh.indices[i];
-            uint32_t idx1 = cubeMesh.indices[i+1];
-            uint32_t idx2 = cubeMesh.indices[i+2];
+            const uint32_t idx0 = cubeMesh.indices[i];
+            const uint32_t idx1 = cubeMesh.indices[i+1];
+            const uint32_t idx2 = cubeMesh.indices[i+2];
 
             // 获取原始顶点
             const Math::Vector3& v0 = cubeMesh.vertices[idx0];
@@ -72,8 +60,8 @@ public:
 
             // Vertex Shader: 变换到裁剪空间
             auto process = [&](const Math::Vector3& v) {
-                Math::Vector4 clip = VertexShader(v, mvp);
-                return ViewportTransform(clip, (int)screenW, (int)screenH);
+                const Math::Vector4 clip = VertexShader(v, mvp);
+                return ViewportTransform(clip, static_cast<int>(screenW), static_cast<int>(screenH));
             };
 
             Math::Vector3 s0 = process(v0);
@@ -91,21 +79,6 @@ public:
             // DrawLine(s1.x, s1.y, s2.x, s2.y, 0xFFFFFFFF);
             // DrawLine(s2.x, s2.y, s0.x, s0.y, 0xFFFFFFFF);
         }
-
-
-        //
-        // // Transform and draw.
-        // auto processVertex = [&](const Math::Vector3& v) {
-        //     const Math::Vector4 clip = VertexShader(v, mvp);
-        //     return ViewportTransform(clip, static_cast<int>(screenW), static_cast<int>(screenH));
-        // };
-        //
-        // const Math::Vector3 s0 = processVertex(v0);
-        // const Math::Vector3 s1 = processVertex(v1);
-        // const Math::Vector3 s2 = processVertex(v2);
-        //
-        // // Draw red wireframe
-        // DrawTriangle(s0, s1, s2, 0xFF00FF00);
     }
 
 private:
